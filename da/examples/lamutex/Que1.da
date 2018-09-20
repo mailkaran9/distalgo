@@ -2,11 +2,12 @@ import sys
 config(channel is fifo, clock is lamport)
 
 class P(process):
-    def setup(s:set, nrequests:int):  # s is set of all other processes
+    def setup(s:set, objStats, nrequests:int):  # s is set of all other processes
         self.q = set()
         
     def request(c):
         output("in request",c)
+        send(('stats', c, self), to= objStats)
         send(('request', c, self), to= s)
         q.add(('request', c, self))
         
@@ -57,6 +58,7 @@ class P(process):
         send(('done', self), to= parent())
         await(received(('done',), from_=parent()))
         output('terminating')
+        send(('statsdone', self), to= objStats)
 
 def main():
     nprocs = int(sys.argv[1]) if len(sys.argv) > 1 else 10

@@ -3,6 +3,8 @@ import Que1
 import orig
 import spec
 import logging
+import random
+import time
 
 config(channel is fifo, clock is lamport)
 
@@ -47,100 +49,269 @@ def main():
     nparam = int(sys.argv[4]) if len(sys.argv) > 2 else 1
     nrepeat = int(sys.argv[5]) if len(sys.argv) > 2 else 1
     
-    #logger.info("Starting Orig process")
+    #logger.info("Starting Testing")
     for i in range(nrun):
-        objStats = new(stats)
-        ps1 = new(orig.P, num=nprocs)
+        numProcs = random.randint(1,nprocs)
+        output("Iteration Number-",i+1)
 
-        setup(objStats,(ps1,))
-        start(objStats)
+        #Running for orig.da file
+        startTimeOrig = time.time()
+        startCpuTime = time.perf_counter()
+        objStatsOrig = new(stats)
+        psOrig = new(orig.P, num=numProcs)
 
-        for p1 in ps1: setup(p1, (ps1-{p1}, objStats, nrequests))
-        start(ps1)
+        setup(objStatsOrig,(psOrig,))
+        start(objStatsOrig)
 
-        await(each(p1 in ps1, has=received(('done', p1))))
-        send(('done',), to=ps1)
-        #logger.info("Ending Orig process")
+        for pOrig in psOrig: setup(pOrig, (psOrig-{pOrig}, objStatsOrig, nrequests))
+        start(psOrig)
 
+        await(each(pOrig in psOrig, has=received(('done', pOrig))))
+        send(('done',), to=psOrig)
+        endTimeOrig = time.time()
+        elapsedTime = endTimeOrig - startTimeOrig
+        output("Elapsed Time:",elapsedTime)
+        endCpuTime = time.perf_counter()
+        elapsedCpuTime = endCpuTime - startCpuTime
+        output("CPU Time:",elapsedCpuTime)
+
+        #Running for Que1.da file
+        startTimeQue1 = time.time()
+        startCpuTime = time.perf_counter()
+        objStatsQue1 = new(stats)
+        psQue1 = new(Que1.P, num=numProcs)
+
+        setup(objStatsQue1,(psQue1,))
+        start(objStatsQue1)
+
+        for pQue1 in psQue1: setup(pQue1, (psQue1-{pQue1}, objStatsQue1, nrequests))
+        start(psQue1)
+
+        await(each(pQue1 in psQue1, has=received(('done', pQue1))))
+        send(('done',), to=psQue1)
+        endTimeQue1 = time.time()
+        elapsedQue1 = endTimeQue1 - startTimeQue1
+        output("Elapsed Time:",elapsedTime)
+        endCpuTime = time.perf_counter()
+        elapsedCpuTime = endCpuTime - startCpuTime
+        output("CPU Time:",elapsedCpuTime)
+        
+        #Running for spec.da file
+        startTimeSpec = time.time()
+        startCpuTime = time.perf_counter()
+        objStatsSpec = new(stats)
+
+        psSpec = new(spec.P, num= numProcs)
+        setup(objStatsSpec,(psSpec,))
+        start(objStatsSpec)
+        for pSpec in psSpec: setup(pSpec, (psSpec-{pSpec},objStatsSpec, nrequests))
+        start(psSpec)
+        endTimeSpec = time.time()
+        elapsedSpec = endTimeSpec - startTimeSpec
+        output("Elapsed Time:",elapsedTime)
+        endCpuTime = time.perf_counter()
+        elapsedCpuTime = endCpuTime - startCpuTime
+        output("CPU Time:",elapsedCpuTime)
+
+    for i in range(nrun):
+        numReqs = random.randint(1,nrequests)
+        output("Iteration Number-",i+1)
+
+        #Running for orig.da file
+        startTimeOrig = time.time()
+        startCpuTime = time.perf_counter()
+        objStatsOrig = new(stats)
+        psOrig = new(orig.P, num=nprocs)
+
+        setup(objStatsOrig,(psOrig,))
+        start(objStatsOrig)
+
+        for pOrig in psOrig: setup(pOrig, (psOrig-{pOrig}, objStatsOrig, numReqs))
+        start(psOrig)
+
+        await(each(pOrig in psOrig, has=received(('done', pOrig))))
+        send(('done',), to=psOrig)
+        endTimeOrig = time.time()
+        elapsedTime = endTimeOrig - startTimeOrig
+        output("Elapsed Time:",elapsedTime)
+        endCpuTime = time.perf_counter()
+        elapsedCpuTime = endCpuTime - startCpuTime
+        output("CPU Time:",elapsedCpuTime)
         
 
-        objStats1 = new(stats)
+        #Running for Que1.da file
+        startTimeQue1 = time.time()
+        startCpuTime = time.perf_counter()
+        objStatsQue1 = new(stats)
+        psQue1 = new(Que1.P, num=nprocs)
+
+        setup(objStatsQue1,(psQue1,))
+        start(objStatsQue1)
+
+        for pQue1 in psQue1: setup(pQue1, (psQue1-{pQue1}, objStatsQue1, numReqs))
+        start(psQue1)
+
+        await(each(pQue1 in psQue1, has=received(('done', pQue1))))
+        send(('done',), to=psQue1)
+        endTimeQue1 = time.time()
+        elapsedQue1 = endTimeQue1 - startTimeQue1
+        output("Elapsed Time:",elapsedTime)
+        endCpuTime = time.perf_counter()
+        elapsedCpuTime = endCpuTime - startCpuTime
+        output("CPU Time:",elapsedCpuTime)
+
         
-        #ps2 = new(Que1.P, num=nprocs)
-        #for p2 in ps2: setup(p2, (ps2-{p2}, nrequests))
-        #start(ps2)
-        #await(each(p2 in ps2, has=received(('done', p2))))
-        #send(('done',), to=ps2)
+        #Running for spec.da file
+        startTimeSpec = time.time()
+        startCpuTime = time.perf_counter()
+        objStatsSpec = new(stats)
 
-        ps3 = new(spec.P, num= nprocs)
-        setup(objStats1,(ps3,))
-        start(objStats1)
-        for p3 in ps3: setup(p3, (ps3-{p3},objStats1, nrequests))
-        start(ps3)
+        psSpec = new(spec.P, num= nprocs)
+        setup(objStatsSpec,(psSpec,))
+        start(objStatsSpec)
+        for pSpec in psSpec: setup(pSpec, (psSpec-{pSpec},objStatsSpec, numReqs))
+        start(psSpec)
+        endTimeSpec = time.time()
+        elapsedSpec = endTimeSpec - startTimeSpec
+        output("Elapsed Time:",elapsedTime)
+        endCpuTime = time.perf_counter()
+        elapsedCpuTime = endCpuTime - startCpuTime
+        output("CPU Time:",elapsedCpuTime)
 
-    nproc_incr=nprocs % nparam
+
+    nproc_start=int(nprocs / nparam)
     for i in range(nrepeat):
-        for j in range(nproc_incr,nprocs,nproc_incr):
-            objStats = new(stats)
-            ps1 = new(orig.P, num=nprocs)
+        for j in range(nparam):
+            for k in range(nproc_start,nprocs+1,nproc_start):
+                output("Value of process:",k)
+                #Running for orig.da file
+                startCpuTime = time.perf_counter()
+                startTimeOrig = time.time()
+                objStatsOrig = new(stats)
+                psOrig = new(orig.P, num=k)
 
-            setup(objStats,(ps1,))
-            start(objStats)
+                setup(objStatsOrig,(psOrig,))
+                start(objStatsOrig)
 
-            for p1 in ps1: setup(p1, (ps1-{p1}, objStats, nrequests))
-            start(ps1)
+                for pOrig in psOrig: setup(pOrig, (psOrig-{pOrig}, objStatsOrig, numReqs))
+                start(psOrig)
 
-            await(each(p1 in ps1, has=received(('done', p1))))
-            send(('done',), to=ps1)
-            #logger.info("Ending Orig process")
+                await(each(pOrig in psOrig, has=received(('done', pOrig))))
+                send(('done',), to=psOrig)
+                endTimeOrig = time.time()
+                elapsedTime = endTimeOrig - startTimeOrig
+                output("Elapsed Time:",elapsedTime)
+                endCpuTime = time.perf_counter()
+                elapsedCpuTime = endCpuTime - startCpuTime
+                output("CPU Time:",elapsedCpuTime)
 
-            
+                #Running for Que1.da file
+                startTimeQue1 = time.time()
+                startCpuTime = time.perf_counter()
+                objStatsQue1 = new(stats)
+                psQue1 = new(Que1.P, num=k)
 
-            objStats1 = new(stats)
-            
-            #ps2 = new(Que1.P, num=nprocs)
-            #for p2 in ps2: setup(p2, (ps2-{p2}, nrequests))
-            #start(ps2)
-            #await(each(p2 in ps2, has=received(('done', p2))))
-            #send(('done',), to=ps2)
+                setup(objStatsQue1,(psQue1,))
+                start(objStatsQue1)
 
-            ps3 = new(spec.P, num= nprocs)
-            setup(objStats1,(ps3,))
-            start(objStats1)
-            for p3 in ps3: setup(p3, (ps3-{p3},objStats1, nrequests))
-            start(ps3)
+                for pQue1 in psQue1: setup(pQue1, (psQue1-{pQue1}, objStatsQue1, numReqs))
+                start(psQue1)
 
-    nreq_incr=nrequests % nparam
+                await(each(pQue1 in psQue1, has=received(('done', pQue1))))
+                send(('done',), to=psQue1)
+                endTimeQue1 = time.time()
+                elapsedQue1 = endTimeQue1 - startTimeQue1
+                output("Elapsed Time:",elapsedTime)
+                endCpuTime = time.perf_counter()
+                elapsedCpuTime = endCpuTime - startCpuTime
+                output("CPU Time:",elapsedCpuTime)
+                    
+                #Running for spec.da file
+                startTimeSpec = time.time()
+                startCpuTime = time.perf_counter()
+                objStatsSpec = new(stats)
+
+                psSpec = new(spec.P, num= k)
+                setup(objStatsSpec,(psSpec,))
+                start(objStatsSpec)
+                for pSpec in psSpec: setup(pSpec, (psSpec-{pSpec},objStatsSpec, numReqs))
+                start(psSpec)
+                endTimeSpec = time.time()
+                elapsedSpec = endTimeSpec - startTimeSpec
+                output("Elapsed Time:",elapsedTime)
+                endTimeSpec = time.time()
+                elapsedSpec = endTimeSpec - startTimeSpec
+                output("Elapsed Time:",elapsedTime)
+                endCpuTime = time.perf_counter()
+                elapsedCpuTime = endCpuTime - startCpuTime
+                output("CPU Time:",elapsedCpuTime)
+
+    nreq_start=int(nrequests / nparam)
     for i in range(nrepeat):
-        for j in range(nreq_incr,nrequests,nreq_incr):
-            objStats = new(stats)
-            ps1 = new(orig.P, num=nprocs)
+        for j in range(nparam):
+            for k in range(nreq_start,nrequests+1,nreq_start):
+                output("Value of request:",k)
+                #Running for orig.da file
+                startTimeOrig = time.time()
+                startCpuTime = time.perf_counter()
+                objStatsOrig = new(stats)
+                psOrig = new(orig.P, num=nprocs)
 
-            setup(objStats,(ps1,))
-            start(objStats)
+                setup(objStatsOrig,(psOrig,))
+                start(objStatsOrig)
 
-            for p1 in ps1: setup(p1, (ps1-{p1}, objStats, nrequests))
-            start(ps1)
+                for pOrig in psOrig: setup(pOrig, (psOrig-{pOrig}, objStatsOrig, k))
+                start(psOrig)
 
-            await(each(p1 in ps1, has=received(('done', p1))))
-            send(('done',), to=ps1)
-            #logger.info("Ending Orig process")
+                await(each(pOrig in psOrig, has=received(('done', pOrig))))
+                send(('done',), to=psOrig)
+                endTimeOrig = time.time()
+                elapsedTime = endTimeOrig - startTimeOrig
+                output("Elapsed Time:",elapsedTime)
+                endCpuTime = time.perf_counter()
+                elapsedCpuTime = endCpuTime - startCpuTime
+                output("CPU Time:",elapsedCpuTime)
 
-            
+                #Running for Que1.da file
+                startTimeQue1 = time.time()
+                startCpuTime = time.perf_counter()
+                objStatsQue1 = new(stats)
+                psQue1 = new(Que1.P, num=nprocs)
 
-            objStats1 = new(stats)
-            
-            #ps2 = new(Que1.P, num=nprocs)
-            #for p2 in ps2: setup(p2, (ps2-{p2}, nrequests))
-            #start(ps2)
-            #await(each(p2 in ps2, has=received(('done', p2))))
-            #send(('done',), to=ps2)
+                setup(objStatsQue1,(psQue1,))
+                start(objStatsQue1)
 
-            ps3 = new(spec.P, num= nprocs)
-            setup(objStats1,(ps3,))
-            start(objStats1)
-            for p3 in ps3: setup(p3, (ps3-{p3},objStats1, nrequests))
-            start(ps3)
+                for pQue1 in psQue1: setup(pQue1, (psQue1-{pQue1}, objStatsQue1, k))
+                start(psQue1)
+
+                await(each(pQue1 in psQue1, has=received(('done', pQue1))))
+                send(('done',), to=psQue1)
+                endTimeQue1 = time.time()
+                elapsedQue1 = endTimeQue1 - startTimeQue1
+                output("Elapsed Time:",elapsedTime)
+                endCpuTime = time.perf_counter()
+                elapsedCpuTime = endCpuTime - startCpuTime
+                output("CPU Time:",elapsedCpuTime)
+                
+                #Running for spec.da file
+                startTimeSpec = time.time()
+                startCpuTime = time.perf_counter()
+                objStatsSpec = new(stats)
+
+                psSpec = new(spec.P, num= nprocs)
+                setup(objStatsSpec,(psSpec,))
+                start(objStatsSpec)
+                for pSpec in psSpec: setup(pSpec, (psSpec-{pSpec},objStatsSpec, k))
+                start(psSpec)
+                endTimeSpec = time.time()
+                elapsedSpec = endTimeSpec - startTimeSpec
+                output("Elapsed Time:",elapsedTime)
+                endTimeSpec = time.time()
+                elapsedSpec = endTimeSpec - startTimeSpec
+                output("Elapsed Time:",elapsedTime)
+                endCpuTime = time.perf_counter()
+                elapsedCpuTime = endCpuTime - startCpuTime
+                output("CPU Time:",elapsedCpuTime)
 
 # This is an executable specification of the algorithm described in
 # Lamport, L. (1978). "Time, clocks, and the ordering of events in a
