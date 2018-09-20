@@ -2,11 +2,12 @@ import sys
 config(channel= 'fifo', clock= 'Lamport')
 
 class P(process):
-    def setup(s:set, nrequests:int): pass  # s is set of all other processes
+    def setup(s:set, objStats1, nrequests:int): pass  # s is set of all other processes
 
     def mutex(task):
         -- request
         c = logical_clock()
+        send(('stats', c, self), to= objStats1)
         send(('request', c, self), to= s)
         await(each(received(('request', c2, p)),
                    has= received(('release', c2, p)) or (c, self) < (c2, p))
@@ -29,6 +30,7 @@ class P(process):
         send(('done', self), to= s)
         await(each(p in s, has= received(('done', p))))
         output('terminating')
+        send(('statsdone', self), to=objStats1 )
 
 def main():
     nprocs = int(sys.argv[1]) if len(sys.argv) > 1 else 10

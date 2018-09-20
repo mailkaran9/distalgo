@@ -1,0 +1,153 @@
+import sys
+import Que1
+import orig
+import spec
+import logging
+
+config(channel is fifo, clock is lamport)
+
+class stats(process):
+
+    def setup(p:set):
+        output("setup")
+
+    def receive(msg= ('stats',_,p)):
+        output("Received STATS message:", p)
+        #data.append(('stats', _ , p))
+        #send(('ack', logical_clock(), self), to= p)
+   
+    def receive(msg= ('statsdone',p)):
+        output("Received STATSDONE message:", p)
+        #data.append(('stats', _ , p))
+        #send(('ack', logical_clock(), self), to= p)
+
+    def run():
+        output("Waiting for STATSDONE message")
+        await(each(x in p,has=received(('statsdone',x))))
+
+        output('terminating-','STATSDONE received')
+
+
+def main():
+  
+    #Create and configure logger 
+    logging.basicConfig(filename="origStats.log", format='%(asctime)s %(message)s', filemode='w') 
+
+
+    logger=logging.getLogger() 
+  
+    #Setting the threshold of logger to INFO 
+    logger.setLevel(logging.INFO)
+    
+    
+
+    nprocs = int(sys.argv[1]) if len(sys.argv) > 1 else 10
+    nrequests = int(sys.argv[2]) if len(sys.argv) > 2 else 1
+    nrun = int(sys.argv[3]) if len(sys.argv) > 2 else 1
+    nparam = int(sys.argv[4]) if len(sys.argv) > 2 else 1
+    nrepeat = int(sys.argv[5]) if len(sys.argv) > 2 else 1
+    
+    #logger.info("Starting Orig process")
+    for i in range(nrun):
+        objStats = new(stats)
+        ps1 = new(orig.P, num=nprocs)
+
+        setup(objStats,(ps1,))
+        start(objStats)
+
+        for p1 in ps1: setup(p1, (ps1-{p1}, objStats, nrequests))
+        start(ps1)
+
+        await(each(p1 in ps1, has=received(('done', p1))))
+        send(('done',), to=ps1)
+        #logger.info("Ending Orig process")
+
+        
+
+        objStats1 = new(stats)
+        
+        #ps2 = new(Que1.P, num=nprocs)
+        #for p2 in ps2: setup(p2, (ps2-{p2}, nrequests))
+        #start(ps2)
+        #await(each(p2 in ps2, has=received(('done', p2))))
+        #send(('done',), to=ps2)
+
+        ps3 = new(spec.P, num= nprocs)
+        setup(objStats1,(ps3,))
+        start(objStats1)
+        for p3 in ps3: setup(p3, (ps3-{p3},objStats1, nrequests))
+        start(ps3)
+
+    nproc_incr=nprocs % nparam
+    for i in range(nrepeat):
+        for j in range(nproc_incr,nprocs,nproc_incr):
+            objStats = new(stats)
+            ps1 = new(orig.P, num=nprocs)
+
+            setup(objStats,(ps1,))
+            start(objStats)
+
+            for p1 in ps1: setup(p1, (ps1-{p1}, objStats, nrequests))
+            start(ps1)
+
+            await(each(p1 in ps1, has=received(('done', p1))))
+            send(('done',), to=ps1)
+            #logger.info("Ending Orig process")
+
+            
+
+            objStats1 = new(stats)
+            
+            #ps2 = new(Que1.P, num=nprocs)
+            #for p2 in ps2: setup(p2, (ps2-{p2}, nrequests))
+            #start(ps2)
+            #await(each(p2 in ps2, has=received(('done', p2))))
+            #send(('done',), to=ps2)
+
+            ps3 = new(spec.P, num= nprocs)
+            setup(objStats1,(ps3,))
+            start(objStats1)
+            for p3 in ps3: setup(p3, (ps3-{p3},objStats1, nrequests))
+            start(ps3)
+
+    nreq_incr=nrequests % nparam
+    for i in range(nrepeat):
+        for j in range(nreq_incr,nrequests,nreq_incr):
+            objStats = new(stats)
+            ps1 = new(orig.P, num=nprocs)
+
+            setup(objStats,(ps1,))
+            start(objStats)
+
+            for p1 in ps1: setup(p1, (ps1-{p1}, objStats, nrequests))
+            start(ps1)
+
+            await(each(p1 in ps1, has=received(('done', p1))))
+            send(('done',), to=ps1)
+            #logger.info("Ending Orig process")
+
+            
+
+            objStats1 = new(stats)
+            
+            #ps2 = new(Que1.P, num=nprocs)
+            #for p2 in ps2: setup(p2, (ps2-{p2}, nrequests))
+            #start(ps2)
+            #await(each(p2 in ps2, has=received(('done', p2))))
+            #send(('done',), to=ps2)
+
+            ps3 = new(spec.P, num= nprocs)
+            setup(objStats1,(ps3,))
+            start(objStats1)
+            for p3 in ps3: setup(p3, (ps3-{p3},objStats1, nrequests))
+            start(ps3)
+
+# This is an executable specification of the algorithm described in
+# Lamport, L. (1978). "Time, clocks, and the ordering of events in a
+# distributed system".  Communications of the ACM, 21(7):558-565.
+
+# This code includes setup and termination for serving a given number of
+# requests per process.
+
+# All labels are not needed,
+# leaving 14 or 15 lines total for the algorithm body and message handlers.
