@@ -37,13 +37,13 @@ class P(process):
 
     def run():
         def task():
-            output('in cs')
+            output('orig: in cs')
         for i in range(nrequests):
             mutex(task)
 
         send(('done', self), to= parent())
         await(received(('done',), from_=parent()))
-        output('terminating---------')
+        output('orig: terminating')
         send(('statsdone', self), to=objStats )
 
 def main():
@@ -51,7 +51,7 @@ def main():
     nrequests = int(sys.argv[2]) if len(sys.argv) > 2 else 1
 
     ps = new(P, num=nprocs)
-    for p in ps: setup(p, (ps-{p}, nrequests))
+    for p in ps: setup(p, (ps-{p},ps, nrequests))
     start(ps)
     await(each(p in ps, has=received(('done', p))))
     send(('done',), to=ps)

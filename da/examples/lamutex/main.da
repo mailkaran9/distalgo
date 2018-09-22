@@ -1,0 +1,598 @@
+import sys
+import Que1
+import orig
+import spec
+import random
+import time
+import os
+sys.stdout = open(os.path.join(os.getcwd(),"Result.txt"), "w")
+
+config(channel is fifo, clock is lamport)
+
+class stats(process):
+
+    def setup(p:set):
+        output("stats:setup")
+
+    def receive(msg= ('stats',_,p)):
+        output("stats:Received STATS message:", p)
+   
+    def receive(msg= ('statsdone',p)):
+        output("stats:Received STATSDONE message:", p)
+
+    def run():
+        output("stats:Waiting for STATSDONE message")
+        await(each(x in p,has=received(('statsdone',x))))
+
+
+
+def main():
+    
+    #number of processes
+    nprocs = int(sys.argv[1]) if len(sys.argv) > 1 else 10
+    #number of requests
+    nrequests = int(sys.argv[2]) if len(sys.argv) > 2 else 1
+    #number of runs
+    nrun = int(sys.argv[3]) if len(sys.argv) > 2 else 1
+    #number of parameters
+    nparam = int(sys.argv[4]) if len(sys.argv) > 2 else 1
+    #number of repetitions
+    nrepeat = int(sys.argv[5]) if len(sys.argv) > 2 else 1
+    
+    if nrequests<nparam or nprocs<nparam:
+        output ("Invalid Input Entered.Make sure number of requests and processes are greater than number of parameters")
+        os._exit(0)
+
+    totalResponseExpected = []
+    totalFailedResponsesOrig = []
+    totalFailedResponsesQue1 = []
+    totalFailedResponsesSpec = []
+
+    #nrun iterations to for correctness by taking random number of requests and processes
+
+    output("-----------------------------------------------------------")
+    output("-----------------CORRECTNESS TESTING-----------------------")
+    output("-----------------------------------------------------------")
+    for i in range(nrun):
+        totalFailedResponsesOrig.append(0)
+        totalFailedResponsesQue1.append(0)
+        totalFailedResponsesSpec.append(0)
+        
+
+        numProcs = random.randint(1,nprocs)
+        numReqs = random.randint(1,nrequests)
+        totalResponseExpected.append(numProcs)
+        output("Iteration Number-",i+1)
+        output("Randomly generated processes = ", numProcs)
+        output("Randomly generated requests = ", numReqs)
+
+        #Running orig.da
+
+        output("Running orig.da for correctness testing")
+
+        objStatsOrig = new(stats)
+        psOrig = new(orig.P, num=numProcs)
+
+        setup(objStatsOrig,(psOrig,))
+        start(objStatsOrig)
+
+        for pOrig in psOrig: setup(pOrig, (psOrig-{pOrig}, objStatsOrig, numReqs))
+        start(psOrig)
+
+        if await(each(pOrig in psOrig, has=received(('done', pOrig)))):
+            send(('done',), to=psOrig)
+        elif timeout(4):
+            output('-----------------TIMEOUT------------------------------')
+            for pOrig in psOrig:
+                if not received(('done',pOrig)):
+                    totalFailedResponsesOrig[i] += 1
+            end(psOrig)
+        end(objStatsOrig)
+
+        #Running Que1.da
+
+        output("Running Que1.da for correctness testing")
+
+        objStatsQue1 = new(stats)
+        psQue1 = new(Que1.P, num=numProcs)
+        setup(objStatsQue1,(psQue1,))
+        start(objStatsQue1)
+
+        for pQue1 in psQue1: setup(pQue1, (psQue1-{pQue1}, objStatsQue1, numReqs))
+        start(psQue1)
+
+        if await(each(pQue1 in psQue1, has=received(('done', pQue1)))):
+            send(('done',), to=psQue1)
+        elif timeout(4):
+            output('-----------------TIMEOUT------------------------------')
+            for pQue1 in psQue1:
+                if not received(('done', pQue1)):
+                    totalFailedResponsesQue1[i] += 1
+            end(psQue1)
+        end(objStatsQue1) 
+
+
+        #Running spec.da
+
+        output("Running spec.da for correctness testing")
+
+        objStatsSpec = new(stats)
+        psSpec = new(spec.P, num=numProcs)
+
+        setup(objStatsSpec,(psSpec,))
+        start(objStatsSpec)
+
+        for pSpec in psSpec: setup(pSpec, (psSpec-{pSpec}, objStatsSpec, numReqs))
+        start(psSpec)
+        end(objStatsSpec)
+
+    storeCpuTimeForEachRepetition = {}
+    storeElapsedTimeForEachRepetition = {}
+    storeCpuTimeForEachRepetitionSpec = {}
+    storeElapsedTimeForEachRepetitionSpec = {}
+    storeCpuTimeForEachRepetitionQue1 = {}
+    storeElapsedTimeForEachRepetitionQue1 = {}
+
+    #Performance Testing
+
+    output("-----------------------------------------------------------")
+    output("-----------------CORRECTNESS TESTING-----------------------")
+    output("-----------------------------------------------------------")
+
+    #Vary number of requests
+
+    nreq_start=int(nrequests / nparam)
+    for k in range(nreq_start,nrequests+1,nreq_start):
+        storeCpuTimeForEachRepetition[k] = []
+        storeElapsedTimeForEachRepetition[k] = []
+        storeCpuTimeForEachRepetitionSpec[k] = []
+        storeElapsedTimeForEachRepetitionSpec[k] = []
+        storeCpuTimeForEachRepetitionQue1[k] = []
+        storeElapsedTimeForEachRepetitionQue1[k] = []
+
+    #nrepeat iterations and vary number of requests
+    for i in range(nrepeat):
+        for k in range(nreq_start,nrequests+1,nreq_start):
+
+            output("Value of request:",k)
+            #Running for orig.da file
+            output("Running orig.da for performance testing")
+            
+            objStatsOrig = new(stats)
+            psOrig = new(orig.P, num=nprocs)
+
+            setup(objStatsOrig,(psOrig,))
+            start(objStatsOrig)
+
+            startTime = time.time()
+            startCpuTime = time.process_time()
+
+            for pOrig in psOrig: setup(pOrig, (psOrig-{pOrig}, objStatsOrig, k))
+            start(psOrig)
+
+            if await(each(pOrig in psOrig, has=received(('done', pOrig)))):
+                send(('done',), to=psOrig)
+
+                endTime = time.time()
+                endCpuTime = time.process_time()
+
+                elapsedTime = endTime - startTime
+                elapsedCpuTime = endCpuTime - startCpuTime
+                storeCpuTimeForEachRepetition[k].append(elapsedCpuTime)
+                storeElapsedTimeForEachRepetition[k].append(elapsedTime)
+            elif timeout(4):
+                output('-----------------TIMEOUT------------------------------')
+                end(psOrig)
+            end(objStatsOrig)  
+
+            
+
+            #Running for Que1.da file
+            output("Running Que1.da for performance testing")
+            
+            objStatsQue1 = new(stats)
+            psQue1 = new(Que1.P, num=nprocs)
+
+            setup(objStatsQue1,(psQue1,))
+            start(objStatsQue1)
+
+            startTime = time.time()
+            startCpuTime = time.process_time()
+
+            for pQue1 in psQue1: setup(pQue1,(psQue1-{pQue1}, objStatsQue1, k))
+            start(psQue1)
+
+            if await(each(pQue1 in psQue1, has=received(('done', pQue1)))):
+                send(('done',), to=psQue1)
+                endTime = time.time()
+                endCpuTime = time.process_time()
+
+                elapsedTime = endTime - startTime
+                elapsedCpuTime = endCpuTime - startCpuTime
+                storeCpuTimeForEachRepetitionQue1[k].append(elapsedCpuTime)
+                storeElapsedTimeForEachRepetitionQue1[k].append(elapsedTime)
+
+            elif timeout(4):
+                output('-----------------TIMEOUT------------------------------')
+                end(psQue1)
+
+            end(objStatsQue1)  
+
+            #Running for spec.da file
+            output("Running spec.da for performance testing")
+
+            objStatsSpec = new(stats)
+
+            psSpec = new(spec.P, num= nprocs)
+            setup(objStatsSpec,(psSpec,))
+            start(objStatsSpec)
+
+            startTime = time.time()
+            startCpuTime = time.process_time()
+
+            for pSpec in psSpec: setup(pSpec, (psSpec-{pSpec},objStatsSpec, k))
+            start(psSpec)
+            endTime = time.time()
+            endCpuTime = time.process_time()
+
+            elapsedSpec = endTime - startTime
+            elapsedCpuTime = endCpuTime - startCpuTime
+            storeCpuTimeForEachRepetitionSpec[k].append(elapsedCpuTime)
+            storeElapsedTimeForEachRepetitionSpec[k].append(elapsedTime)
+
+
+    #finding average CPU and Elapsed Time
+    averageCpuTime = {}
+    averageCpuTimeSpec = {}
+    averageCpuTimeQue1 = {}
+    averageElapsedTime = {}
+    averageElapsedTimeSpec = {}
+    averageElapsedTimeQue1 = {}
+
+    for key, value in storeCpuTimeForEachRepetition.items():
+        sum = 0.0
+        count = len(value)
+        for i in value:
+            sum += i
+        if count == 0:
+            averageCpuTime[key] = "Failure"
+        else:
+            averageCpuTime[key] = sum/count
+
+    for key, value in storeCpuTimeForEachRepetitionSpec.items():
+        sum = 0.0
+        count = len(value)
+        for i in value:
+            sum += i
+        if count == 0:
+            averageCpuTimeSpec[key] = "Failure"
+        else:
+            averageCpuTimeSpec[key] = sum/count
+
+    for key, value in storeCpuTimeForEachRepetitionQue1.items():
+        sum = 0.0
+        count = len(value)
+        for i in value:
+            sum += i
+        if count == 0:
+            averageCpuTimeQue1[key] = "Failure"
+        else:
+            averageCpuTimeQue1[key] = sum/count
+
+    for key, value in storeElapsedTimeForEachRepetition.items():
+        sum = 0.0
+        count = len(value)
+        for i in value:
+            sum += i
+        if count == 0:
+            averageElapsedTime[key] = "Failure"
+        else:
+            averageElapsedTime[key] = sum/count
+
+    for key, value in storeElapsedTimeForEachRepetition.items():
+        sum = 0.0
+        count = len(value)
+        for i in value:
+            sum += i
+        if count == 0:
+            averageElapsedTimeSpec[key] = "Failure"
+        else:
+            averageElapsedTimeSpec[key] = sum/count
+
+    for key, value in storeElapsedTimeForEachRepetitionQue1.items():
+        sum = 0.0
+        count = len(value)
+        for i in value:
+            sum += i
+        if count == 0:
+            averageElapsedTimeQue1[key] = "Failure"
+        else:    
+            averageElapsedTimeQue1[key] = sum/count
+
+
+    storeCpuTimeForEachRepetition1 = {}
+    storeElapsedTimeForEachRepetition1 = {}
+    storeCpuTimeForEachRepetitionSpec1 = {}
+    storeElapsedTimeForEachRepetitionSpec1 = {}
+    storeCpuTimeForEachRepetitionQue11 = {}
+    storeElapsedTimeForEachRepetitionQue11 = {}
+
+    #vary number of processes
+
+    nproc_start=int(nprocs / nparam)
+    for k in range(nproc_start,nprocs+1,nproc_start):
+        storeCpuTimeForEachRepetition1[k] = []
+        storeElapsedTimeForEachRepetition1[k] = []
+        storeCpuTimeForEachRepetitionSpec1[k] = []
+        storeElapsedTimeForEachRepetitionSpec1[k] = []
+        storeCpuTimeForEachRepetitionQue11[k] = []
+        storeElapsedTimeForEachRepetitionQue11[k] = []
+
+    #nrepeat iterations and vary number of processes
+    for i in range(nrepeat):
+        for k in range(nproc_start,nprocs+1,nproc_start):
+
+            output("Value of request:",k)
+            #Running for orig.da file
+            output("Running orig.da for performance testing")
+            
+            objStatsOrig = new(stats)
+            psOrig = new(orig.P, num=k)
+
+            setup(objStatsOrig,(psOrig,))
+            start(objStatsOrig)
+
+            startTime = time.time()
+            startCpuTime = time.process_time()
+
+            for pOrig in psOrig: setup(pOrig, (psOrig-{pOrig}, objStatsOrig, nprocs))
+            start(psOrig)
+
+            if await(each(pOrig in psOrig, has=received(('done', pOrig)))):
+                send(('done',), to=psOrig)
+
+                endTime = time.time()
+                endCpuTime = time.process_time()
+
+                elapsedTime = endTime - startTime
+                elapsedCpuTime = endCpuTime - startCpuTime
+                storeCpuTimeForEachRepetition1[k].append(elapsedCpuTime)
+                storeElapsedTimeForEachRepetition1[k].append(elapsedTime)
+            elif timeout(4):
+                output('-----------------TIMEOUT------------------------------')
+                end(psOrig)
+            end(objStatsOrig)  
+
+            
+
+            #Running for Que1.da file
+            output("Running Que1.da for performance testing")
+            
+            objStatsQue1 = new(stats)
+            psQue1 = new(Que1.P, num=k)
+
+            setup(objStatsQue1,(psQue1,))
+            start(objStatsQue1)
+
+            startTime = time.time()
+            startCpuTime = time.process_time()
+
+            for pQue1 in psQue1: setup(pQue1,(psQue1-{pQue1}, objStatsQue1, nprocs))
+            start(psQue1)
+
+            if await(each(pQue1 in psQue1, has=received(('done', pQue1)))):
+                send(('done',), to=psQue1)
+                endTime = time.time()
+                endCpuTime = time.process_time()
+
+                elapsedTime = endTime - startTime
+                elapsedCpuTime = endCpuTime - startCpuTime
+                storeCpuTimeForEachRepetitionQue11[k].append(elapsedCpuTime)
+                storeElapsedTimeForEachRepetitionQue11[k].append(elapsedTime)
+
+            elif timeout(4):
+                output('-----------------TIMEOUT------------------------------')
+                end(psQue1)
+
+            end(objStatsQue1)  
+
+            #Running for spec.da file
+            output("Running spec.da for performance testing")
+            objStatsSpec = new(stats)
+
+            psSpec = new(spec.P, num= k)
+            setup(objStatsSpec,(psSpec,))
+            start(objStatsSpec)
+
+            startTime = time.time()
+            startCpuTime = time.process_time()
+
+            for pSpec in psSpec: setup(pSpec, (psSpec-{pSpec},objStatsSpec, nprocs))
+            start(psSpec)
+            endTimeSpec = time.time()
+            endCpuTime = time.process_time()
+
+            elapsedSpec = endTime - startTime
+            elapsedCpuTime = endCpuTime - startCpuTime
+            storeCpuTimeForEachRepetitionSpec1[k].append(elapsedCpuTime)
+            storeElapsedTimeForEachRepetitionSpec1[k].append(elapsedTime)
+
+    #finding average CPU and Elapsed Time
+    averageCpuTime1 = {}
+    averageCpuTimeSpec1 = {}
+    averageCpuTimeQue11 = {}
+    averageElapsedTime1 = {}
+    averageElapsedTimeSpec1 = {}
+    averageElapsedTimeQue11 = {}
+
+    for key, value in storeCpuTimeForEachRepetition1.items():
+        sum = 0.0
+        count = len(value)
+        for i in value:
+            sum += i
+        if count == 0:
+            averageCpuTime1[key] = "Failure"
+        else:
+            averageCpuTime1[key] = sum/count
+
+    for key, value in storeCpuTimeForEachRepetitionSpec1.items():
+        sum = 0.0
+        count = len(value)
+        for i in value:
+            sum += i
+        if count == 0:
+            averageCpuTimeSpec1[key] = "Failure"
+        else:
+            averageCpuTimeSpec1[key] = sum/count
+
+    for key, value in storeCpuTimeForEachRepetitionQue11.items():
+        sum = 0.0
+        count = len(value)
+        for i in value:
+            sum += i
+        if count == 0:
+            averageCpuTimeQue11[key] = "Failure"
+        else:
+            averageCpuTimeQue11[key] = sum/count
+
+    for key, value in storeElapsedTimeForEachRepetition1.items():
+        sum = 0.0
+        count = len(value)
+        for i in value:
+            sum += i
+        if count == 0:
+            averageElapsedTime1[key] = "Failure"
+        else:
+            averageElapsedTime1[key] = sum/count
+
+    for key, value in storeElapsedTimeForEachRepetition1.items():
+        sum = 0.0
+        count = len(value)
+        for i in value:
+            sum += i
+        if count == 0:
+            averageElapsedTimeSpec1[key] = "Failure"
+        else:
+            averageElapsedTimeSpec1[key] = sum/count
+
+    for key, value in storeElapsedTimeForEachRepetitionQue11.items():
+        sum = 0.0
+        count = len(value)
+        for i in value:
+            sum += i
+        if count == 0:
+            averageElapsedTimeQue11[key] = "Failure"
+        else:
+            averageElapsedTimeQue11[key] = sum/count
+
+
+    time.sleep(3)
+    output("-------------------------------------------------------------------")
+    output("-------------------------------------------------------------------")
+    output("---------------TESTING CORRECTNESS---------------------------------")
+    print("---------------TESTING CORRECTNESS---------------------------------")
+    output("-------------------------------------------------------------------")
+
+    output ("{:<8} {:<15} {:<25} {:<25} ".format('RUN','Program','Total Responses Expected','Timeout Received'))
+    print ("{:<8} {:<15} {:<25} {:<25} ".format('RUN','Program','Total Responses Expected','Timeout Received'))
+    prog=["orig","Que1","spec"]
+    for i in range(nrun):
+
+        output ("{:<8} {:<25} {:<25} {:<25}".format(i+1, prog[0], totalResponseExpected[i], totalFailedResponsesOrig))
+        output ("{:<8} {:<25} {:<25} {:<25}".format(i+1, prog[1], totalResponseExpected[i], totalFailedResponsesQue1[i]))
+        output ("{:<8} {:<25} {:<25} {:<25}".format(i+1, prog[2], totalResponseExpected[i], totalFailedResponsesSpec[i]))
+
+        print ("{:<8} {:<25} {:<25} {:<25}".format(i+1, prog[0], totalResponseExpected[i], totalFailedResponsesOrig[i]))
+        print ("{:<8} {:<25} {:<25} {:<25}".format(i+1, prog[1], totalResponseExpected[i], totalFailedResponsesQue1[i]))
+        print ("{:<8} {:<25} {:<25} {:<25}".format(i+1, prog[2], totalResponseExpected[i], totalFailedResponsesSpec[i]))
+
+    output("----------------------------------------------------------------------")
+    output("----------------------------------------------------------------------")
+    output("----------------------------------------------------------------------")
+
+    print("----------------------------------------------------------------------")
+    output("----------------------------------------------------------------------")
+    output("----------------------------------------------------------------------")
+    output("---------------TESTING PERFORMANCE------------------------------------")
+    print("---------------TESTING PERFORMANCE------------------------------------")
+    output("----------------------------------------------------------------------")
+    output("----------------------------------------------------------------------")
+    output("-----------------Varying Requests-------------------------------------")
+    print("------------------Varying Requests-------------------------------------")
+    output("----------------------------------------------------------------------")
+    prog=["orig","Que1","spec"]
+
+    output ("{:<8} {:<15} {:<25} ".format('Program','Requests','Elapsed Time'))
+    print ("{:<8} {:<15} {:<25} ".format('Program','Requests','Elapsed Time'))  
+    for key,value in averageElapsedTime.items():
+        output ("{:<8} {:<15} {:<25} ".format(prog[0],key,value))
+        print ("{:<8} {:<15} {:<25} ".format(prog[0],key,value))
+    for key,value in averageElapsedTimeQue1.items():
+        output ("{:<8} {:<15} {:<25} ".format(prog[1],key,value)) 
+        print ("{:<8} {:<15} {:<25} ".format(prog[1],key,value))
+    for key,value in averageElapsedTimeSpec.items():
+        output ("{:<8} {:<15} {:<25} ".format(prog[2],key,value)) 
+        print ("{:<8} {:<15} {:<25} ".format(prog[2],key,value))
+
+    output("----------------------------------------------------------------------")
+    print("----------------------------------------------------------------------")
+
+    output ("{:<8} {:<15} {:<25} ".format('Program','Requests','CPU Time'))
+    print ("{:<8} {:<15} {:<25} ".format('Program','Requests','CPU Time'))
+    for key,value in averageCpuTime.items():
+        output ("{:<8} {:<15} {:<25} ".format(prog[0],key,value))
+        print ("{:<8} {:<15} {:<25} ".format(prog[0],key,value))
+    for key,value in averageCpuTimeQue1.items():
+        output ("{:<8} {:<15} {:<25} ".format(prog[1],key,value)) 
+        print ("{:<8} {:<15} {:<25} ".format(prog[1],key,value))
+    for key,value in averageCpuTimeSpec.items():
+        output ("{:<8} {:<15} {:<25} ".format(prog[2],key,value)) 
+        print ("{:<8} {:<15} {:<25} ".format(prog[2],key,value)) 
+
+    output("----------------------------------------------------------------------")
+    output("-----------------Varying Processes-------------------------------------")
+    print("-----------------Varying Processes-------------------------------------")
+    output("----------------------------------------------------------------------")
+
+    output ("{:<8} {:<15} {:<25}".format('Program','Processes','Elapsed Time'))
+    print ("{:<8} {:<15} {:<25}".format('Program','Processes','Elapsed Time'))  
+    for key,value in averageElapsedTime1.items():
+        output ("{:<8} {:<15} {:<25} ".format(prog[0],key,value))
+        print ("{:<8} {:<15} {:<25} ".format(prog[0],key,value))
+    for key,value in averageElapsedTimeQue11.items():
+        output ("{:<8} {:<15} {:<25} ".format(prog[1],key,value))
+        print ("{:<8} {:<15} {:<25} ".format(prog[1],key,value)) 
+    for key,value in averageElapsedTimeSpec1.items():
+        output ("{:<8} {:<15} {:<25} ".format(prog[2],key,value)) 
+        print ("{:<8} {:<15} {:<25} ".format(prog[2],key,value))
+
+    output("----------------------------------------------------------------------")
+    print("----------------------------------------------------------------------")
+
+    output ("{:<8} {:<15} {:<25} ".format('Program','Processes','CPU Time'))
+
+    print ("{:<8} {:<15} {:<25} ".format('Program','Processes','CPU Time'))
+    for key,value in averageCpuTime1.items():
+        output ("{:<8} {:<15} {:<25} ".format(prog[0],key,value))
+        print ("{:<8} {:<15} {:<25} ".format(prog[0],key,value))
+    for key,value in averageCpuTimeQue11.items():
+        output ("{:<8} {:<15} {:<25} ".format(prog[1],key,value)) 
+        print ("{:<8} {:<15} {:<25} ".format(prog[1],key,value))
+    for key,value in averageCpuTimeSpec1.items():
+        output ("{:<8} {:<15} {:<25} ".format(prog[2],key,value)) 
+        print ("{:<8} {:<15} {:<25} ".format(prog[2],key,value)) 
+
+    output("----------------------------------------------------------------------")
+
+
+
+
+# This is an executable specification of the algorithm described in
+# Lamport, L. (1978). "Time, clocks, and the ordering of events in a
+# distributed system".  Communications of the ACM, 21(7):558-565.
+
+# This code includes setup and termination for serving a given number of
+# requests per process.
+
+# All labels are not needed,
+# leaving 14 or 15 lines total for the algorithm body and message handlers.

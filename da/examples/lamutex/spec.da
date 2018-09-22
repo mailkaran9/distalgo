@@ -22,14 +22,14 @@ class P(process):
 
     def run():
         def task():
-            output('in cs')
-            output('releasing cs')
+            output('spec: in cs')
+            output('spec: releasing cs')
         for i in range(nrequests):
             mutex(task)
 
         send(('done', self), to= s)
         await(each(p in s, has= received(('done', p))))
-        output('terminating')
+        output('spec: terminating')
         send(('statsdone', self), to=objStats1 )
 
 def main():
@@ -37,7 +37,7 @@ def main():
     nrequests = int(sys.argv[2]) if len(sys.argv) > 2 else 1
 
     ps = new(P, num= nprocs)
-    for p in ps: setup(p, (ps-{p}, nrequests))
+    for p in ps: setup(p, (ps-{p},ps, nrequests))
     start(ps)
 
 # This is an executable specification that simplifies the algorithm in

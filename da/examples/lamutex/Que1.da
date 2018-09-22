@@ -6,32 +6,39 @@ class P(process):
         self.q = set()
         
     def request(c):
-        output("in request",c)
+        #output("in request",c)
         send(('stats', c, self), to= objStats)
         send(('request', c, self), to= s)
         q.add(('request', c, self))
         
-    def ack(c):
-        output("in ack",c)    
+    def ackAndCS(task,c):
+        #output("in ack",c)    
         await(each(('request', c2, p) in q,
                    has= (c2, p)==(c, self) or (c, self) < (c2, p)) and
               each(p in s, has= some(received(('ack', c2, _p)), has= c2 > c)))
-    def criticalSection(task):
-        output("in CS")
         task()
+
+
     
     def release(c):
-        output("in release",c)
-        q.remove(('request', c, self))
+        #output("in release",c)
+        #q.remove(('request', c, self))
+        for x in setof(('request', c, self), ('request', c, self) in q):
+            q.remove(x)
+            break
         send(('release', logical_clock(), self), to= s)
               
               
     def mutex(task):
         c = logical_clock()
         request(c)
-        ack(c)
-        criticalSection(task)
+        d = logical_clock()
+        request(d)
+        ackAndCS(task,c)
         release(c)
+
+        ackAndCS(task,d)
+        release(d)
         
 
     def receive(msg= ('request', c2, p)):
@@ -51,21 +58,23 @@ class P(process):
 
     def run():
         def task():
-            output('in cs')
+            output('Que1: in cs')
         for i in range(nrequests):
             mutex(task)
 
         send(('done', self), to= parent())
         await(received(('done',), from_=parent()))
-        output('terminating')
-        send(('statsdone', self), to= objStats)
+        output('Que1: terminating')
+        send(('statsdone', self), to=objStats ) 
+
+        
 
 def main():
     nprocs = int(sys.argv[1]) if len(sys.argv) > 1 else 10
     nrequests = int(sys.argv[2]) if len(sys.argv) > 2 else 1
 
     ps = new(P, num=nprocs)
-    for p in ps: setup(p, (ps-{p}, nrequests))
+    for p in ps: setup(p, (ps-{p},ps, nrequests))
     start(ps)
     await(each(p in ps, has=received(('done', p))))
     send(('done',), to=ps)
