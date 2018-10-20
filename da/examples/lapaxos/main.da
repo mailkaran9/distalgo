@@ -2,13 +2,27 @@ import sys
 from random import randint
 TIMEOUT = 1
 
+learnedValue={}
+
 class Proposer(process):
     def setup(acceptors:set):
         self.n = None              # proposal number
+        self.maxProp = None        #value returned if proposer fails to get majority
         self.majority = acceptors  # majority of acceptors; all in other papers
+        
 
     def to_consent():
         n = (0, self) if n == None else (n[0]+1, self)  # pick a prop num
+
+        if maxProp!=None:
+            output("--------------------------maxprop:",maxProp[0])
+            if(maxProp[0] > n[0]):
+                output("==============================================GULATI update N:old value",n)
+                output("++++++++++++++++++++++GULATI update N",maxProp)
+                n=(maxProp[0]+1,self)
+                output("$$$$$$$$$$$$$$$$$$GULATI update N:new value",n)
+
+        output("!!!!!!!!!!GULATI PRINT n",n)
         send(('prepare', n), to= majority)
 
         if await(len(setof(a, received(('respond', _n, _), from_ =a)))
@@ -17,16 +31,27 @@ class Proposer(process):
                             n2==max(setof(n2, received(('respond', _n, (n2, _))))))
                       or {randint(1,100)})  # any value, pick in 1..100
             responded = setof(a, received(('respond', _n, _), from_ =a))
+            send(('proposeValue',v),to=nodeof(self))
             send(('accept', n, v), to= responded)
             debug('### chose', n, v)
 
         elif timeout(TIMEOUT):
             output('failed proposal number', n)
+			
+    def receive(msg= ('updateProp', n, max)):
+        if max != None:
+            #output("GULATIhere I am",max[0])
+            #output(max[0])
+            maxProp=max[0]	
+
+	
+	
 
     def run():
         while not received(('done',)):
             to_consent()
         output('terminating')
+
 
     def anyof(s):
         return next(iter(s)) if s else None
@@ -39,6 +64,10 @@ class Acceptor(process):
             maxprop = anyof(setof((n, v), sent(('accepted', n, v)),
                                n==max(setof(n, sent(('accepted', n, _))))))
             send(('respond', n, maxprop), to =p)
+        else:
+            maxprop = anyof(setof((n, v), sent(('accepted', n, v)),
+                               n==max(setof(n, sent(('accepted', n, _))))))
+            send(('updateProp', n, maxprop), to =p)
 
     def receive(msg= ('accept', n, v)):
         if not some(sent(('respond', n2, _)), has= n2 > n):
@@ -55,6 +84,7 @@ class Acceptor(process):
 class Learner(process):
     def setup(acceptors:set): 
         self.learnedVal = None
+
     def learn():
         if await(some(received(('accepted', n, v)),
                       has= len(setof(a, received(('accepted', _n, _v), from_=a)))
@@ -70,6 +100,8 @@ class Learner(process):
         output('terminating')
         send(('learned', ), to=nodeof(self))
         send(('learnedValue',learnedVal), to=nodeof(self))
+
+
 
 def main():
     nacceptors = int(sys.argv[1]) if len(sys.argv) > 1 else 3
@@ -94,11 +126,25 @@ def main():
         if a is not None and len(a)==1:
             count = count + 1
         s = s | a
-    if(count == nlearners and len(s)==1):
+
+    element = next(iter(s))
+    valueProposed = False
+    valProp = set()
+    for p in proposers:
+        prop = setof(val, received(('proposeValue',val),from_=l),True)
+        valProp = valProp | prop
+    output("proposed set===============",valProp)
+    if element!=None and element[1] in valProp:
+        output("element[1]===((((((",element[1])
+        valProposed = True
+    if(count == nlearners and len(s)==1 and valProposed == True):
         output("Proposer and Value learned =",s)
         output("CORRECTNESS TESTING -------------PASS")
     else:
         output("CORRECTNESS TESTING -------------FAIL")
+            
+
+
 
 # This is an executable specification of the algorithm described in
 # Lamport, L. (2001).  Paxos Made Simple.  ACM SIGACT News 
