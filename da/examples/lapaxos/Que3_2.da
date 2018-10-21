@@ -122,7 +122,12 @@ class Learner(process):
         learn()
         output('terminating')
         send(('learned', ), to=nodeof(self))
+
         send(('learnedValue',learnedVal), to=nodeof(self))
+        output("LEARNING DONE SENDING")
+        send(('learning_done',self), to= parent())
+
+        output("LEARNING DONE SENT")
 
     def messageLoss(r):
         randomVal = random.uniform(0,1)
@@ -130,51 +135,6 @@ class Learner(process):
             return True
         else:
             return False
-
-
-def main():
-    nacceptors = int(sys.argv[1]) if len(sys.argv) > 1 else 3
-    nproposers = int(sys.argv[2]) if len(sys.argv) > 2 else 5
-    nlearners = int(sys.argv[3]) if len(sys.argv) > 3 else 3
-
-    r = 1
-    d=1
-    acceptors = new(Acceptor, num= nacceptors)
-    proposers = new(Proposer, (acceptors,2,1,r,d), num= nproposers)
-    learners = new(Learner, (acceptors,20,r,d), num= nlearners)
-    for p in acceptors: setup(p, (learners,r,d))
-    start(acceptors | proposers | learners)
-
-    await(each(l in learners, has=received(('learned',), from_=l)))
-    output('done')
-    send(('done',), to= (acceptors|proposers))
-
-    s = set()
-
-    count = 0
-    for l in learners:
-        a = setof(val, received(('learnedValue',val),from_=l),True)
-        if a is not None and len(a)==1:
-            count = count + 1
-        s = s | a
-
-    element = None
-    if (len(s)>0 and next(iter(s))!=None):
-        element = next(iter(s))
-    valueProposed = False
-    valProp = set()
-    for p in proposers:
-        prop = setof(val, received(('proposeValue',val),from_=l),True)
-        valProp = valProp | prop
-    output("Set of Proposed Values: ",valProp)
-    if element!=None and element[1] in valProp:
-        valueProposed = True
-    if(count == nlearners and len(s)==1 and valueProposed == True):
-        output("Proposer and Value learned =",s)
-        output("CORRECTNESS TESTING -------------PASS")
-    else:
-        output("CORRECTNESS TESTING -------------FAIL")
-            
 
 
 
