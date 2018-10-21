@@ -1,154 +1,71 @@
 import sys
-from random import randint
-TIMEOUT = 1
+import random
+import time
+from Que3_2 import Acceptor
+from Que3_2 import Proposer
+from Que3_2 import Learner
+config(channel is fifo, clock is lamport)
 
-learnedValue={}
+class PaxosEval(process):
+    def setup(p,a,l,n,r,d,w,tp,tl):  # s is set of all other processes
+        self.p=p
+        self.a=a
+        self.l=l
+        self.n=n
+        self.r=r
+        self.d=d
+        self.w=w
+        self.tp=tp
+        self.tl=tl
 
-class Proposer(process):
-    def setup(acceptors:set):
-        self.n = None              # proposal number
-        self.maxProp = None        #value returned if proposer fails to get majority
-        self.majority = acceptors  # majority of acceptors; all in other papers
-        
-
-    def to_consent():
-        n = (0, self) if n == None else (n[0]+1, self)  # pick a prop num
-
-        if maxProp!=None:
-            output("--------------------------maxprop:",maxProp[0])
-            if(maxProp[0] > n[0]):
-                output("==============================================GULATI update N:old value",n)
-                output("++++++++++++++++++++++GULATI update N",maxProp)
-                n=(maxProp[0]+1,self)
-                output("$$$$$$$$$$$$$$$$$$GULATI update N:new value",n)
-
-        output("!!!!!!!!!!GULATI PRINT n",n)
-        send(('prepare', n), to= majority)
-
-        if await(len(setof(a, received(('respond', _n, _), from_ =a)))
-                 > len(acceptors)/2):
-            v = anyof(setof(v, received(('respond', _n, (n2, v))),
-                            n2==max(setof(n2, received(('respond', _n, (n2, _))))))
-                      or {randint(1,100)})  # any value, pick in 1..100
-            responded = setof(a, received(('respond', _n, _), from_ =a))
-            send(('proposeValue',v),to=nodeof(self))
-            send(('accept', n, v), to= responded)
-            debug('### chose', n, v)
-
-        elif timeout(TIMEOUT):
-            output('failed proposal number', n)
-			
-    def receive(msg= ('updateProp', n, max)):
-        if max != None:
-            #output("GULATIhere I am",max[0])
-            #output(max[0])
-            maxProp=max[0]	
-
-	
-	
-
+    def setupProcesses(): pass
+        #acceptors = new(Acceptor, num= a)
+        #proposers = new(Proposer, (acceptors,), num= p)
+        #learners = new(Learner, (acceptors,), num= l)
+        #for p in acceptors: setup(p, (learners,))
+        #output("Acceptors", acceptors, "Proposers", proposers, "L:earners", learners)
     def run():
-        while not received(('done',)):
-            to_consent()
-        output('terminating')
-
-
-    def anyof(s):
-        return next(iter(s)) if s else None
-
-class Acceptor(process):
-    def setup(learners:set): pass
-
-    def receive(msg= ('prepare', n), from_= p):
-        if each(sent(('respond', n2, _)), has= n > n2):
-            maxprop = anyof(setof((n, v), sent(('accepted', n, v)),
-                               n==max(setof(n, sent(('accepted', n, _))))))
-            send(('respond', n, maxprop), to =p)
-        else:
-            maxprop = anyof(setof((n, v), sent(('accepted', n, v)),
-                               n==max(setof(n, sent(('accepted', n, _))))))
-            send(('updateProp', n, maxprop), to =p)
-
-    def receive(msg= ('accept', n, v)):
-        if not some(sent(('respond', n2, _)), has= n2 > n):
-            send(('accepted', n, v), to= learners)
-
-    def run():
-        await(received(('done',)))
-        output('terminating')
-
-    def anyof(s):
-        """return any element of set s if s is not empty or 'None' otherwise"""
-        return next(iter(s)) if s else None
-
-class Learner(process):
-    def setup(acceptors:set): 
-        self.learnedVal = None
-
-    def learn():
-        if await(some(received(('accepted', n, v)),
-                      has= len(setof(a, received(('accepted', _n, _v), from_=a)))
-                           > len(acceptors)/2)):
-            learnedVal = (n[1],v)
-            output('learned', n, v)
-
-        elif timeout(TIMEOUT * 10):
-            output('failed learning anything')
-
-    def run():
-        learn()
-        output('terminating')
-        send(('learned', ), to=nodeof(self))
-        send(('learnedValue',learnedVal), to=nodeof(self))
-
-
-
+        #setupProcesses()
+        output('terminating...')
+        send(('done', self), to= parent())
+        output("waiting in class")
+        await(received(('done'), from_=parent()))
+        output("waiting in class:exit")
+        output("Received done from parent")
 def main():
-    nacceptors = int(sys.argv[1]) if len(sys.argv) > 1 else 3
-    nproposers = int(sys.argv[2]) if len(sys.argv) > 2 else 5
-    nlearners = int(sys.argv[3]) if len(sys.argv) > 3 else 3
+    # p - number of proposers
+    p = int(sys.argv[1]) if len(sys.argv) > 3 else 5
 
-    acceptors = new(Acceptor, num= nacceptors)
-    proposers = new(Proposer, (acceptors,), num= nproposers)
-    learners = new(Learner, (acceptors,), num= nlearners)
-    for p in acceptors: setup(p, (learners,))
-    start(acceptors | proposers | learners)
+    # a - number of acceptors
+    a = int(sys.argv[2]) if len(sys.argv) > 3 else 5
 
-    await(each(l in learners, has=received(('learned',), from_=l)))
-    output('done')
-    send(('done',), to= (acceptors|proposers))
+    # l - number of learners
+    l = int(sys.argv[3]) if len(sys.argv) > 3 else 5
 
-    s = set()
+    # n - number of repetitions for each run
+    n = int(sys.argv[4]) if len(sys.argv) > 10 else 10
+    
+    # r - message loss rate
+    r = int(sys.argv[5]) if len(sys.argv) > 1 else 0
+    
+    # d - message delay
+    d = int(sys.argv[6]) if len(sys.argv) > 1 else 0
+    
+    # w - wait time
+    w = int(sys.argv[7]) if len(sys.argv) > 1 else 0
+    
+    # tp - timeout for proposers
+    tp = int(sys.argv[8]) if len(sys.argv) > 1 else 1
 
-    count = 0
-    for l in learners:
-        a = setof(val, received(('learnedValue',val),from_=l),True)
-        if a is not None and len(a)==1:
-            count = count + 1
-        s = s | a
+    # tl - timeout for learners
+    tl = int(sys.argv[9]) if len(sys.argv) > 1 else 1
+    
+    paxos = new(PaxosEval, num=1)
+    setup(paxos,(p,a,l,n,r,d,w,tp,tl))
+    start(paxos)
+    output("waiting in main")
 
-    element = next(iter(s))
-    valueProposed = False
-    valProp = set()
-    for p in proposers:
-        prop = setof(val, received(('proposeValue',val),from_=l),True)
-        valProp = valProp | prop
-    output("proposed set===============",valProp)
-    if element!=None and element[1] in valProp:
-        output("element[1]===((((((",element[1])
-        valProposed = True
-    if(count == nlearners and len(s)==1 and valProposed == True):
-        output("Proposer and Value learned =",s)
-        output("CORRECTNESS TESTING -------------PASS")
-    else:
-        output("CORRECTNESS TESTING -------------FAIL")
-            
-
-
-
-# This is an executable specification of the algorithm described in
-# Lamport, L. (2001).  Paxos Made Simple.  ACM SIGACT News 
-# (Distributed Computing Column), 32(4):51-58, December.
-
-# This code includes setup and termination for running repeated rounds until
-# the learners all terminate after learning the consent value or timeout.
+    await(each(pa in paxos, has=received(('done', pa))))
+    output("waiting in main:exit")
+    
+    send(('done'), to=paxos)
