@@ -15,14 +15,13 @@ class Proposer(process):
         n = (0, self) if n == None else (n[0]+1, self)  # pick a prop num
 
         if maxProp!=None:
-            output("--------------------------maxprop:",maxProp[0])
             if(maxProp[0] > n[0]):
-                output("==============================================GULATI update N:old value",n)
-                output("++++++++++++++++++++++GULATI update N",maxProp)
+                #prempt and update proposal number
+                output("Old Proposal Number: ",n)
                 n=(maxProp[0]+1,self)
-                output("$$$$$$$$$$$$$$$$$$GULATI update N:new value",n)
+                output("New Proposal Number: ",n)
 
-        output("!!!!!!!!!!GULATI PRINT n",n)
+
         send(('prepare', n), to= majority)
 
         if await(len(setof(a, received(('respond', _n, _), from_ =a)))
@@ -31,7 +30,9 @@ class Proposer(process):
                             n2==max(setof(n2, received(('respond', _n, (n2, _))))))
                       or {randint(1,100)})  # any value, pick in 1..100
             responded = setof(a, received(('respond', _n, _), from_ =a))
+
             send(('proposeValue',v),to=nodeof(self))
+
             send(('accept', n, v), to= responded)
             debug('### chose', n, v)
 
@@ -39,13 +40,10 @@ class Proposer(process):
             output('failed proposal number', n)
             
     def receive(msg= ('updateProp', n, max)):
-        if max != None:
-            #output("GULATIhere I am",max[0])
-            #output(max[0])
-            maxProp=max[0]  
-
-    
-    
+        if ((max != None and maxProp==None) or (max!=None and maxProp!=None and max[0][0]>maxProp[0])):
+            output("max -------",max)
+            output("maxprop ----",maxProp)
+            maxProp = max[0]   
 
     def run():
         while not received(('done',)):
@@ -65,8 +63,9 @@ class Acceptor(process):
                                n==max(setof(n, sent(('accepted', n, _))))))
             send(('respond', n, maxprop), to =p)
         else:
-            maxprop = anyof(setof((n, v), sent(('accepted', n, v)),
-                               n==max(setof(n, sent(('accepted', n, _))))))
+            #return max proposal
+            maxprop = anyof(setof((n, v), sent(('respond', n, v)),
+                               n==max(setof(n, sent(('respond', n, _))))))
             send(('updateProp', n, maxprop), to =p)
 
     def receive(msg= ('accept', n, v)):
@@ -133,9 +132,8 @@ def main():
     for p in proposers:
         prop = setof(val, received(('proposeValue',val),from_=l),True)
         valProp = valProp | prop
-    output("proposed set===============",valProp)
+    output("Set of Proposed Values: ",valProp)
     if element!=None and element[1] in valProp:
-        output("element[1]===((((((",element[1])
         valProposed = True
     if(count == nlearners and len(s)==1 and valProposed == True):
         output("Proposer and Value learned =",s)
